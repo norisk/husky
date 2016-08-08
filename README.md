@@ -27,6 +27,20 @@ npm install husky --save-dev
 git commit -m "Keep calm and commit"
 ```
 
+### Huskypack (Multiple sup repositories)
+´´´javascript
+  "huskypack": [
+    {
+      "glob": "sub/directory/grunt/glob*/",
+      "cmd_prefix": "subone_",
+      "arg": {
+        "name": "-rep=",
+        "value": "lastDirname"
+      }
+    }
+  ],
+```
+
 Existing hooks aren't replaced and adding `--no-verify` to your git commands lets you bypass hooks. You can also use [any Git hook](HOOKS.md).  Optionally include the environment variable `$GIT_PARAMS` in your scripts to access any command-line parameters provided by git.
 
 ## Tips
