@@ -2,6 +2,7 @@ var fs = require('fs')
 var path = require('path')
 var exec = require('child_process').exec
 var normalize = require('normalize-path')
+var glob = require("glob")
 
 module.exports = {
   isHusky: function (filename) {
@@ -10,11 +11,67 @@ module.exports = {
   },
 
   hooksDir: function (callback) {
+    // Assuming that this file is in node_modules/husky/src
+    var packageDir = path.join(__dirname, '..', '..', '..')
+
+    // On Windows normalize path (i.e. convert \ to /)
+    var normalizedPath = normalize(packageDir)
+
+    // get package_json
+    var package_json = require(path.join(normalizedPath, "package.json"));
+
     exec('git rev-parse --git-dir', function (error, stdout, stderr) {
       if (error) {
         callback(stderr, null)
       } else {
-        callback(null, stdout.trim() + '/hooks')
+
+        // add hooks for main repository
+        callback(null, stdout.trim() + '/hooks', '')
+
+        // if a glob is defined in package_json, add there hooks as well
+        if (package_json.huskypack || true) {
+          // check if glob is filled
+          for (var g = package_json.huskypack.length - 1; g >= 0; g--) {
+            // get settings & cmd_prefix
+            var packsetting = package_json.huskypack[g];
+            var cmd_prefix = packsetting.cmd_prefix || "";
+
+            // get glob
+            glob(packsetting.glob, {cwd: normalizedPath}, function (er, files) {
+
+              // cycle through all files
+              for (var i = files.length - 1; i >= 0; i--) {
+                // git dir
+                var git_dir = path.join(normalizedPath, files[i], '.git');
+
+                // create args if args is given in settings
+                var args = [];
+                if (packsetting.arg) {
+                  var value = "";
+
+                  // different arg types
+                  switch (packsetting.arg.value) {
+
+                    // default uses directory-name 
+                    default:
+                    case "lastDirname":
+                      var parts = files[i].split(path.sep);
+                      value = parts[parts.length-2];
+                      break;
+                  }
+                  // push to args
+                  args.push(packsetting.arg.name+value);
+                }
+
+                // if globbed dir has git, add hooks
+                if (fs.existsSync(git_dir)) {
+                  callback(null, path.join(git_dir, 'hooks'), cmd_prefix, args)
+                }
+              }
+
+            })
+          }
+        }
       }
     })
   },
@@ -24,7 +81,7 @@ module.exports = {
     fs.chmodSync(filename, 0755)
   },
 
-  create: function (dir, name, cmd) {
+  create: function (dir, name, cmd, args) {
     var filename = dir + '/' + name
     var arr = [
       '#!/bin/sh',
@@ -86,13 +143,19 @@ module.exports = {
     // Can't find npm message
     var npmNotFound = 'husky - can\'t find npm in PATH. Skipping ' + cmd + ' script in package.json'
 
+    // Prepare cmd arguments
+    var cmd_args = "";
+    if (args && args.length > 0) {
+      cmd_args = " -- " + args.join(" ");
+    }
+
     arr = arr.concat([
       // Test if npm is in PATH
       'command -v npm >/dev/null 2>&1 || { echo >&2 "' + npmNotFound + '"; exit 0; }',
 
       // Run script
       'export GIT_PARAMS="$*"',
-      'npm run ' + cmd,
+      'npm run ' + cmd + cmd_args,
       'if [ $? -ne 0 ]; then',
       '  echo',
       '  echo "husky - ' + name + ' hook failed (add --no-verify to bypass)"',

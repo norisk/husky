@@ -10,6 +10,6 @@ husky.hooksDir(function(err, dir) {
     hooks.forEach(function (hook) {
       husky.remove(dir, hook)
     })
-    console.log('done\n')
+    console.log(dir + ' done\n')
   }
 })
