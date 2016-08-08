@@ -29,7 +29,7 @@ module.exports = {
         callback(null, stdout.trim() + '/hooks', '')
 
         // if a glob is defined in package_json, add there hooks as well
-        if (package_json.huskypack || true) {
+        if (package_json.huskypack) {
           // check if glob is filled
           for (var g = package_json.huskypack.length - 1; g >= 0; g--) {
             // get settings & cmd_prefix
